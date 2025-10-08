@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openshift-cluster-gitops
+  namespace: cluster-gitops
+spec:
+  project: cluster
+  source:
+    repoURL: https://github.com/<YOUR_ORGANIZATION>/openshift-cluster-gitops.git
+    targetRevision: main
+    path: applications
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ''
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
