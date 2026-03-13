@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-keycloak
+  labels:
+    app.kubernetes.io/name: demo-keycloak
+    app.kubernetes.io/part-of: argocd-demo-apps

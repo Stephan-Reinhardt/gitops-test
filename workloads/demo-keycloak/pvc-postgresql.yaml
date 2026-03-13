@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-data
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: argocd-demo-apps
+spec:
+  storageClassName: localblock
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-nginx
+  labels:
+    app.kubernetes.io/name: demo-nginx
+    app.kubernetes.io/part-of: argocd-demo-apps

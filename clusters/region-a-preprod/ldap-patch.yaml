@@ -1,0 +1,12 @@
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+    - name: corp-ldap
+      mappingMethod: claim
+      type: LDAP
+      ldap:
+        url: ldaps://ldap-ra.example.com/ou=users,dc=example,dc=com?uid?sub?(memberOf=cn=ocp-preprod-users,ou=groups,dc=example,dc=com)
+        bindDN: uid=openshift-bind-preprod,ou=svc,dc=example,dc=com

@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-configs
+  namespace: openshift-gitops
+spec:
+  generators:
+    - list:
+        elements:
+          - name: region-a-poc
+            server: https://kubernetes.default.svc
+            path: clusters/region-a-poc
+          - name: region-a-test
+            server: https://api.ra-test.example.com:6443
+            path: clusters/region-a-test
+          - name: region-a-preprod
+            server: https://api.ra-preprod.example.com:6443
+            path: clusters/region-a-preprod
+          - name: region-a-prod
+            server: https://api.ra-prod.example.com:6443
+            path: clusters/region-a-prod
+          - name: region-b-prod
+            server: https://api.rb-prod.example.com:6443
+            path: clusters/region-b-prod
+  template:
+    metadata:
+      name: '{{name}}-cluster-config'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/example/openshift-cluster-gitops-example.git
+        targetRevision: main
+        path: '{{path}}'
+      destination:
+        server: '{{server}}'
+        namespace: openshift-gitops
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=false
+          - ServerSideApply=true

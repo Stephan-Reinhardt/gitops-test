@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nginx
+  namespace: demo-nginx
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: argocd-demo-apps
+spec:
+  to:
+    kind: Service
+    name: nginx
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
