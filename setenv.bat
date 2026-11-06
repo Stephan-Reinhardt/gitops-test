@@ -1,62 +1,69 @@
 @echo off
 rem ------------------------------------------------------------------
-rem  Build the Launch4j exe without admin rights.
-rem  Env vars set here only live for this script (setlocal),
-rem  nothing is changed on the system.
+rem  Start Launch4j with a specific Java - no admin rights needed.
+rem
+rem    launch4j.bat                 -> opens the Launch4j GUI
+rem    launch4j.bat myapp.xml       -> builds the exe from that config
+rem
+rem  Variables only apply to this script (setlocal).
 rem ------------------------------------------------------------------
 setlocal
 
-rem === adjust these paths to where you unzipped the tools ===========
-set "TOOLS=%USERPROFILE%\tools"
-set "JAVA_HOME=%TOOLS%\jdk8"
-set "LAUNCH4J_HOME=%TOOLS%\launch4j"
-set "ANT_HOME=%TOOLS%\apache-ant"
-rem set "MAVEN_HOME=%TOOLS%\apache-maven"
-
-rem Launch4j config, relative to this .bat file
-set "L4J_CONFIG=%~dp0launch4j.xml"
+rem === adjust these two paths ========================================
+set "JAVA_HOME=%USERPROFILE%\tools\jdk8"
+set "LAUNCH4J_HOME=%USERPROFILE%\tools\launch4j"
 rem ==================================================================
 
-set "PATH=%JAVA_HOME%\bin;%ANT_HOME%\bin;%PATH%"
-rem set "PATH=%MAVEN_HOME%\bin;%PATH%"
+set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
+set "JAVAW_EXE=%JAVA_HOME%\bin\javaw.exe"
+set "L4J_JAR=%LAUNCH4J_HOME%\launch4j.jar"
+
+rem Also put this Java first on PATH, in case Launch4j looks there
+set "PATH=%JAVA_HOME%\bin;%PATH%"
 
 rem --- sanity checks -------------------------------------------------
-if not exist "%JAVA_HOME%\bin\java.exe" (
-    echo [ERROR] java.exe not found in "%JAVA_HOME%\bin" - check JAVA_HOME
-    goto :error
+if not exist "%JAVA_EXE%" (
+    echo [ERROR] Java not found: "%JAVA_EXE%"
+    echo         Check JAVA_HOME at the top of this file.
+    pause
+    exit /b 1
 )
-if not exist "%LAUNCH4J_HOME%\launch4j.jar" (
-    echo [ERROR] launch4j.jar not found in "%LAUNCH4J_HOME%" - check LAUNCH4J_HOME
-    goto :error
-)
-if not exist "%L4J_CONFIG%" (
-    echo [ERROR] Launch4j config not found: "%L4J_CONFIG%"
-    goto :error
+if not exist "%L4J_JAR%" (
+    echo [ERROR] Launch4j not found: "%L4J_JAR%"
+    echo         Check LAUNCH4J_HOME at the top of this file.
+    pause
+    exit /b 1
 )
 
-echo Using Java:
-java -version
+echo Java:     "%JAVA_EXE%"
+"%JAVA_EXE%" -version
+echo Launch4j: "%L4J_JAR%"
 echo.
 
-rem --- work from the project folder (where this .bat lives) ---------
-cd /d "%~dp0"
+rem --- no argument: open the GUI ------------------------------------
+if "%~1"=="" (
+    rem javaw = no extra console window; start = this window can close
+    start "Launch4j" "%JAVAW_EXE%" -jar "%L4J_JAR%"
+    exit /b 0
+)
 
-rem --- 1. build the jar (uncomment what the project uses) -----------
-rem call ant jar || goto :error
-rem call mvn -q package || goto :error
+rem --- argument given: build from config ----------------------------
+if not exist "%~f1" (
+    echo [ERROR] Config file not found: "%~f1"
+    pause
+    exit /b 1
+)
 
-rem --- 2. wrap it into the exe -------------------------------------
-rem Calling launch4j.jar directly with our java avoids launch4jc.exe
-rem having to search for a Java runtime on its own.
-java -jar "%LAUNCH4J_HOME%\launch4j.jar" "%L4J_CONFIG%" || goto :error
+echo Building from "%~f1" ...
+"%JAVA_EXE%" -jar "%L4J_JAR%" "%~f1"
+if errorlevel 1 (
+    echo.
+    echo [FAILED] Launch4j returned an error.
+    pause
+    exit /b 1
+)
 
 echo.
-echo [OK] Build finished.
+echo [OK] Done.
 endlocal
 exit /b 0
-
-:error
-echo.
-echo [FAILED] Build aborted.
-endlocal
-exit /b 1
