@@ -11,12 +11,22 @@ Crypto (same as the sealed-secrets controller):
 Because the stdlib has no YAML parser, the secret is given like
 `kubectl create secret generic`, or as a JSON Secret (kubectl ... -o json):
 
-  python seal.py --cert cert.pem --name db --namespace app \
+  python seal_stdlib.py --cert cert.pem --name db --namespace app \
       --from-literal user=admin --from-literal password=hunter2 \
       --from-file tls.crt=./tls.crt  -o sealed.yaml
 
   kubectl create secret generic db -n app --from-literal=a=b --dry-run=client -o json > s.json
-  python seal.py --cert cert.pem --secret-json s.json -o sealed.yaml
+  python seal_stdlib.py --cert cert.pem --secret-json s.json -o sealed.yaml
+
+Image pull secret (type kubernetes.io/dockerconfigjson), like
+`kubectl create secret docker-registry`. The token is prompted for (hidden)
+unless --docker-password-stdin is given, so it never lands in shell history:
+
+  python seal.py --cert cert.pem --name regcred -n app \
+      --docker-server registry.cluster.lan --docker-username robot -o sealed.yaml
+
+  echo "$TOKEN" | python seal.py ... --docker-server ghcr.io \
+      --docker-username me --docker-password-stdin
 
 Options: --scope strict|namespace-wide|cluster-wide (default strict),
          --type (default Opaque), --label k=v (template labels), -o FILE (default stdout)
@@ -29,6 +39,7 @@ import base64
 import hashlib
 import json
 import os
+import getpass
 import re
 import struct
 import sys
@@ -214,6 +225,12 @@ def main():
     ap.add_argument("--type", default=None)
     ap.add_argument("--from-literal", type=kv, action="append", default=[], metavar="KEY=VALUE")
     ap.add_argument("--from-file", type=kv, action="append", default=[], metavar="KEY=PATH")
+    g = ap.add_argument_group("image pull secret (kubernetes.io/dockerconfigjson)")
+    g.add_argument("--docker-server", help="registry host, e.g. registry.cluster.lan or ghcr.io")
+    g.add_argument("--docker-username", help="registry user (robot/deploy-token name)")
+    g.add_argument("--docker-password", help="token (insecure: visible in shell history; prefer prompt/stdin)")
+    g.add_argument("--docker-password-stdin", action="store_true", help="read the token from stdin")
+    g.add_argument("--docker-email", help="optional email field")
     ap.add_argument("--label", type=kv, action="append", default=[], metavar="KEY=VALUE")
     ap.add_argument("-o", "--output", help="output file (default: stdout)")
     a = ap.parse_args()
@@ -236,6 +253,25 @@ def main():
     for k, p in a.from_file:
         with open(p, "rb") as f:
             data[k] = f.read()
+    if a.docker_server:
+        if not a.docker_username:
+            sys.exit("error: --docker-username is required with --docker-server")
+        if a.docker_password_stdin:
+            pw = sys.stdin.read().rstrip("\r\n")
+        elif a.docker_password is not None:
+            pw = a.docker_password
+        else:
+            pw = getpass.getpass(f"token for {a.docker_username}@{a.docker_server}: ")
+        if not pw:
+            sys.exit("error: empty registry token")
+        entry = {"username": a.docker_username, "password": pw,
+                 "auth": base64.b64encode(f"{a.docker_username}:{pw}".encode()).decode()}
+        if a.docker_email:
+            entry["email"] = a.docker_email
+        data[".dockerconfigjson"] = json.dumps({"auths": {a.docker_server: entry}}).encode()
+        stype = "kubernetes.io/dockerconfigjson"
+    elif a.docker_username or a.docker_password or a.docker_password_stdin:
+        sys.exit("error: --docker-* options need --docker-server")
     labels.update(dict(a.label))
     stype = a.type or stype
 
@@ -244,7 +280,7 @@ def main():
     if a.scope != "cluster-wide" and not ns:
         sys.exit("error: --namespace is required for scope " + a.scope)
     if not data:
-        sys.exit("error: no data given (--from-literal / --from-file / --secret-json)")
+        sys.exit("error: no data given (--from-literal / --from-file / --secret-json / --docker-server)")
 
     label = {"strict": f"{ns}/{name}", "namespace-wide": ns or "", "cluster-wide": ""}[a.scope].encode()
     n, e = load_rsa_public_key(a.cert)
